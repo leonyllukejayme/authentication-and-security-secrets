@@ -36,6 +36,7 @@ const userSchema = new mongoose.Schema({
 	email: String,
 	password: String,
 	googleId: String,
+	secret: Array,
 });
 
 //Setup userSchema as a plugin
@@ -47,21 +48,21 @@ const User = new mongoose.model('User', userSchema);
 //Create a local login strategy
 passport.use(User.createStrategy());
 // and set a passport to serialize and deserialze user
-passport.serializeUser(function(user, cb) {
-	process.nextTick(function() {
-	  return cb(null, {
-		id: user.id,
-		username: user.username,
-		picture: user.picture
-	  });
+passport.serializeUser(function (user, cb) {
+	process.nextTick(function () {
+		return cb(null, {
+			id: user.id,
+			username: user.username,
+			picture: user.picture,
+		});
 	});
-  });
-  
-  passport.deserializeUser(function(user, cb) {
-	process.nextTick(function() {
-	  return cb(null, user);
+});
+
+passport.deserializeUser(function (user, cb) {
+	process.nextTick(function () {
+		return cb(null, user);
 	});
-  });
+});
 
 passport.use(
 	new GoogleStrategy(
@@ -105,12 +106,46 @@ app.get('/register', (req, res) => {
 	res.render('register');
 });
 
-app.get('/secrets', (req, res) => {
+app.get('/secrets',async (req, res) => {
+	try {
+		const result = await User.find({secret: {$ne:null}})
+		res.render('secrets',{secrets: result})
+		// console.log(result)
+	} catch (error) {
+		console.log(error)
+	}
+
+	// User.find({secret:{$ne:null}}).then((foundUser)=>{
+	// 	res.render('secrets',{secrets: foundUser})
+	// })
+	// .catch((err)=>{
+	// 	console.log(err);
+	// })
+});
+
+app.get('/submit', (req, res) => {
 	if (req.isAuthenticated()) {
-		res.render('secrets');
+		res.render('submit');
 	} else {
 		res.redirect('/login');
 	}
+});
+
+app.post('/submit', (req, res) => {
+	const submittedPost = req.body.secret;
+
+	User.findById(req.user.id, (err, foundUser) => {
+		if (err) {
+			console.log(err);
+		} else {
+			if (foundUser) {
+				foundUser.secret.push(submittedPost);
+				foundUser.save(() => {
+					res.redirect('/secrets');
+				});
+			}
+		}
+	});
 });
 
 app.get('/logout', (req, res) => {
